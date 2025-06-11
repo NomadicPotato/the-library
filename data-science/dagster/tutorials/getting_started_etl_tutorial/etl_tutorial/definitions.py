@@ -156,6 +156,7 @@ def missing_dimension_check(duckdb: DuckDBResource) -> dg.AssetCheckResult:
 
 monthly_partition = dg.MonthlyPartitionsDefinition(start_date="2024-01-01") #partition defined outside of any function
 
+# This asset calculates monthly sales performance and stores it in a DuckDB table.
 @dg.asset(
     partitions_def=monthly_partition, # partition used here
     compute_kind="duckdb",
@@ -214,6 +215,7 @@ product_category_partition = dg.StaticPartitionsDefinition(
     ["Electronics", "Books", "Home and Garden", "Clothing"]
 )
 
+# This asset calculates product performance for each category and stores it in a DuckDB table.
 @dg.asset(
     deps=[joined_data],
     partitions_def=product_category_partition,
@@ -265,6 +267,88 @@ def product_performance(context: dg.AssetExecutionContext, duckdb: DuckDBResourc
         }
     )
 
+# Seems to be a class with abstract parameters for adhoc requests
+class AdhocRequestConfig(dg.Config):
+    department: str
+    product: str
+    start_date: str
+    end_date: str
+
+# we are creating an ad hoc config asset based on the class above?
+@dg.asset(
+    deps=["joined_data"],
+    compute_kind="python",
+)
+def adhoc_request(
+    config: AdhocRequestConfig, duckdb: DuckDBResource
+) -> dg.MaterializeResult:
+    query = f"""
+        select
+            department,
+            rep_name,
+            product_name,
+            sum(dollar_amount) as total_sales
+        from joined_data
+        where date >= '{config.start_date}'
+        and date < '{config.end_date}'
+        and department = '{config.department}'
+        and product_name = '{config.product}'
+        group by
+            department,
+            rep_name,
+            product_name
+    """
+
+    with duckdb.get_connection() as conn:
+        preview_df = conn.execute(query).fetchdf()
+
+    return dg.MaterializeResult(
+        metadata={"preview": dg.MetadataValue.md(preview_df.to_markdown(index=False))}
+    )
+
+#need to define a job for adhoc requests it seems
+adhoc_request_job = dg.define_asset_job(
+    name="adhoc_request_job",
+    selection=dg.AssetSelection.assets("adhoc_request"),
+)
+
+# This sensor monitors a directory for new or modified JSON files
+@dg.sensor(job=adhoc_request_job)
+def adhoc_request_sensor(context: dg.SensorEvaluationContext):
+    PATH_TO_REQUESTS = os.path.join(os.path.dirname(__file__), "../", "data/requests")
+
+    previous_state = json.loads(context.cursor) if context.cursor else {}
+    current_state = {}
+    runs_to_request = []
+
+    for filename in os.listdir(PATH_TO_REQUESTS):
+        file_path = os.path.join(PATH_TO_REQUESTS, filename)
+        if filename.endswith(".json") and os.path.isfile(file_path):
+            last_modified = os.path.getmtime(file_path)
+
+            current_state[filename] = last_modified
+
+            # if the file is new or has been modified since the last run, add it to the request queue
+            if (
+                filename not in previous_state
+                or previous_state[filename] != last_modified
+            ):
+                with open(file_path) as f:
+                    request_config = json.load(f)
+
+                runs_to_request.append(
+                    dg.RunRequest(
+                        run_key=f"adhoc_request_{filename}_{last_modified}",
+                        run_config={
+                            "ops": {"adhoc_request": {"config": {**request_config}}}
+                        },
+                    )
+                )
+
+    return dg.SensorResult(
+        run_requests=runs_to_request, cursor=json.dumps(current_state)
+    )
+
 weekly_update_schedule = dg.ScheduleDefinition(
     name="analysis_update_job",
     target=dg.AssetSelection.keys("joined_data").upstream(),
@@ -278,9 +362,12 @@ defs = dg.Definitions(
             joined_data,
             monthly_sales_performance,
             product_performance,
+            adhoc_request,
     ], # had to manually add this in
     asset_checks=[missing_dimension_check], # note that had to add a line for asset checks
     schedules=[weekly_update_schedule], # run on a weekly schedule
+    jobs=[adhoc_request_job], # job for adhoc requests
+    sensors=[adhoc_request_sensor], # sensor for adhoc requests
     resources={"duckdb": DuckDBResource(database="data/mydb.duckdb")},
 )
 
