@@ -1,0 +1,3 @@
+#ignore temporary files from dagster
+.tmp* 
+*.pyc
