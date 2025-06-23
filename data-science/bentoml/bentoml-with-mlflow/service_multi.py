@@ -4,6 +4,7 @@ import numpy.typing as npt
 from bentoml.models import BentoModel
 
 from common import MyInputParams, my_image
+# Demo that shows running multiple parallel models or endpoints. Useful for ensamble models
 
 @bentoml.service(
     image=my_image,

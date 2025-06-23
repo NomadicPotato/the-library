@@ -3,6 +3,7 @@ import numpy as np
 import numpy.typing as npt
 from bentoml.models import BentoModel
 from common import MyInputParams, my_image
+# Demo that show putting parameters outside of the service
 
 @bentoml.service(
     image=my_image,

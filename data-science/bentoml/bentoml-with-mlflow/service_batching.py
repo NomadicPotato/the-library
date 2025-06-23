@@ -2,7 +2,7 @@ import bentoml
 import numpy as np
 
 from bentoml.models import BentoModel
-
+# Demo that shows batchig requests rather than firing on every request. not async
 #PythonImage is deprecated. use Image instead
 demo_image = bentoml.images.Image(python_version="3.11") \
     .python_packages("mlflow", "scikit-learn")

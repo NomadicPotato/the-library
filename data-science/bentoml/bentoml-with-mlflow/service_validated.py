@@ -5,6 +5,7 @@ from bentoml.models import BentoModel
 from pydantic import Field
 from bentoml.validators import Shape, DType
 from typing import Annotated
+# Demo that shows how to run a bento with pydantic validated inputs
 
 #PythonImage is deprecated. use Image instead
 demo_image = bentoml.images.Image(python_version="3.11") \
