@@ -5,13 +5,15 @@ from bentoml.models import BentoModel
 
 # Define the runtime environment for your Bento
 #PythonImage is deprecated. use Image instead
-demo_image = bentoml.images.Image(python_version="3.11") \
-    .python_packages("mlflow", "scikit-learn")
+demo_image = (
+    bentoml.images.Image(python_version='3.12')
+    .python_packages("mlflow","scikit-learn")
+)
 
 target_names = ['setosa', 'versicolor', 'virginica']
 
 @bentoml.service(
-    # image=demo_image,
+    image=demo_image, # COMMENTING THIS OUT CAUSED 8 HOURS OF PAIN AND MISERY...
     resources={"cpu": "1"},
     traffic={"timeout": 10},
 )
