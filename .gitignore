@@ -1,3 +1,7 @@
 #ignore temporary files from dagster
 .tmp* 
 *.pyc
+
+# Ignore mlruns from mlflow
+*mlruns*
+*mlartifacts*
