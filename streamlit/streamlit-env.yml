@@ -1,0 +1,15 @@
+name: streamlit
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - scikit-learn
+      - streamlit
+      - streamlit-aggrid
+      - pandas
+      - numpy
+      - matplotlib
+      - seaborn
+      - plotly
